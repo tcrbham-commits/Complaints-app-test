@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f4e79">
+  <title>Log a Complaint</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Log a Complaint</h1>
+  </header>
+
+  <main>
+    <form id="complaint-form" novalidate>
+      <section class="card" id="access-section" hidden>
+        <h2>Team access</h2>
+        <label>Access code
+          <input type="password" name="accessCode" id="accessCode" autocomplete="off">
+        </label>
+        <p class="hint">Ask your manager for the code. It's remembered on this device.</p>
+      </section>
+
+      <section class="card">
+        <h2>You</h2>
+        <label>Your name *
+          <input name="repName" id="repName" required maxlength="100" autocomplete="name">
+        </label>
+        <label>Your email
+          <input name="repEmail" id="repEmail" type="email" maxlength="200" autocomplete="email">
+        </label>
+        <p class="hint">Saved on this device so you don't have to retype it.</p>
+      </section>
+
+      <section class="card">
+        <h2>Customer</h2>
+        <label>Customer / company name *
+          <input name="customerName" required maxlength="150">
+        </label>
+        <div class="row">
+          <label>Account no.
+            <input name="accountNumber" maxlength="50">
+          </label>
+          <label>Order / invoice no.
+            <input name="orderNumber" maxlength="60">
+          </label>
+        </div>
+        <div class="row">
+          <label>Contact name
+            <input name="contactName" maxlength="100">
+          </label>
+          <label>Contact phone
+            <input name="contactPhone" type="tel" maxlength="40">
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Complaint</h2>
+        <div class="row">
+          <label>Category *
+            <select name="category" id="category" required>
+              <option value="">Choose…</option>
+            </select>
+          </label>
+          <label>Priority
+            <select name="priority" id="priority"></select>
+          </label>
+        </div>
+        <label>Product
+          <input name="productName" maxlength="150">
+        </label>
+        <label>What happened? *
+          <textarea name="description" rows="5" required maxlength="5000"
+            placeholder="Describe the issue, what the customer expects, and any agreed next steps."></textarea>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>Photos</h2>
+        <div class="photo-buttons">
+          <label class="button secondary">
+            📷 Take photo
+            <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
+          </label>
+          <label class="button secondary">
+            🖼️ Gallery
+            <input type="file" id="gallery-input" accept="image/*" multiple hidden>
+          </label>
+        </div>
+        <p class="hint" id="photo-hint"></p>
+        <ul id="previews" class="previews"></ul>
+      </section>
+
+      <p id="error" class="error" role="alert" hidden></p>
+
+      <button type="submit" id="submit" class="button primary">Send complaint</button>
+    </form>
+
+    <section id="success" class="card success" hidden>
+      <h2>Complaint sent ✅</h2>
+      <p>Reference: <strong id="reference"></strong></p>
+      <p>It has been emailed to the CRM inbox.</p>
+      <button type="button" id="new-complaint" class="button primary">Log another</button>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
