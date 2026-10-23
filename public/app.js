@@ -57,15 +57,43 @@
     if (message) errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
+  const IMAGE_EXT = /\.(jpe?g|png|webp|gif|heic|heif)$/i;
+
+  // Some Android gallery apps hand over photos with no MIME type, so fall
+  // back to the file extension.
+  function isImage(file) {
+    return file.type ? file.type.startsWith('image/') : IMAGE_EXT.test(file.name);
+  }
+
+  // Older Safari lacks createImageBitmap (or its options), so fall back to
+  // decoding through an <img> element, which every browser supports.
+  async function decodeImage(file) {
+    if (window.createImageBitmap) {
+      try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { /* try next */ }
+      try { return await createImageBitmap(file); } catch { /* try next */ }
+    }
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      return img;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   async function shrinkImage(file) {
     try {
-      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-      const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+      const image = await decodeImage(file);
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
       const canvas = document.createElement('canvas');
-      canvas.width = Math.round(bitmap.width * scale);
-      canvas.height = Math.round(bitmap.height * scale);
-      canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      bitmap.close?.();
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(height * scale);
+      canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+      image.close?.();
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY));
       if (blob) return { blob, name: file.name.replace(/\.[^.]+$/, '') + '.jpg' };
     } catch {
@@ -81,11 +109,15 @@
         showError(`You can attach up to ${options.maxFiles} photos.`);
         break;
       }
-      if (!file.type.startsWith('image/')) {
-        showError(`"${file.name}" is not an image.`);
+      if (!isImage(file)) {
+        showError(`"${file.name}" is not a photo. Choose a JPG, PNG or HEIC image.`);
         continue;
       }
       const { blob, name } = await shrinkImage(file);
+      if (!blob.type) {
+        showError(`"${file.name}" couldn't be read. Try taking the photo again or choosing a JPG.`);
+        continue;
+      }
       if (blob.size > options.maxFileSizeMb * 1024 * 1024) {
         showError(`"${file.name}" is too large (max ${options.maxFileSizeMb} MB).`);
         continue;
