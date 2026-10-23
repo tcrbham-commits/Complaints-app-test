@@ -4,7 +4,7 @@ const express = require('express');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
 const { loadConfig } = require('./config');
-const { CATEGORIES, PRIORITIES, makeReference, buildComplaintEmail } = require('./email');
+const { makeReference, buildComplaintEmail } = require('./email');
 
 const ALLOWED_MIME = new Set([
   'image/jpeg',
@@ -26,6 +26,7 @@ const LIMITS = {
   contactPhone: 40,
   orderNumber: 60,
   productName: 150,
+  summary: 80,
   description: 5000,
 };
 
@@ -44,7 +45,7 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ha, hb);
 }
 
-function validate(body) {
+function validate(body, config) {
   const errors = [];
   const complaint = {};
 
@@ -59,10 +60,10 @@ function validate(body) {
   if (!complaint.description) errors.push('Description is required');
   if (complaint.repEmail && !EMAIL_RE.test(complaint.repEmail)) errors.push('Your email address is not valid');
 
-  complaint.category = CATEGORIES.includes(body.category) ? body.category : '';
-  if (!complaint.category) errors.push('Choose a complaint category');
+  complaint.category = config.problemTypes.includes(body.category) ? body.category : '';
+  if (!complaint.category) errors.push('Choose a problem type');
 
-  complaint.priority = PRIORITIES.includes(body.priority) ? body.priority : 'Medium';
+  complaint.priority = config.priorities.includes(body.priority) ? body.priority : config.defaultPriority;
 
   return { complaint, errors };
 }
@@ -91,8 +92,9 @@ function createApp({ config = loadConfig(), transport } = {}) {
 
   app.get('/api/options', (req, res) => {
     res.json({
-      categories: CATEGORIES,
-      priorities: PRIORITIES,
+      problemTypes: config.problemTypes,
+      priorities: config.priorities,
+      defaultPriority: config.defaultPriority,
       maxFiles: config.maxFiles,
       maxFileSizeMb: config.maxFileSizeMb,
       requiresAccessCode: Boolean(config.accessCode),
@@ -109,7 +111,7 @@ function createApp({ config = loadConfig(), transport } = {}) {
 
   app.post('/api/complaints', checkAccess, upload.array('photos', config.maxFiles), async (req, res, next) => {
     try {
-      const { complaint, errors } = validate(req.body || {});
+      const { complaint, errors } = validate(req.body || {}, config);
       if (errors.length) return res.status(400).json({ error: errors.join('. '), errors });
 
       const now = new Date();

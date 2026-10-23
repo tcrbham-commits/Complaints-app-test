@@ -62,7 +62,7 @@
       <section class="card">
         <h2>Complaint</h2>
         <div class="row">
-          <label>Category *
+          <label>Problem type *
             <select name="category" id="category" required>
               <option value="">Choose…</option>
             </select>
@@ -73,6 +73,9 @@
         </div>
         <label>Product
           <input name="productName" maxlength="150">
+        </label>
+        <label>Summary (one line)
+          <input name="summary" maxlength="80" placeholder="e.g. 3 pallets arrived crushed">
         </label>
         <label>What happened? *
           <textarea name="description" rows="5" required maxlength="5000"

@@ -41,8 +41,8 @@
       showError('Could not reach the server. Check your connection and reload.');
       return;
     }
-    fillSelect(document.getElementById('category'), options.categories);
-    fillSelect(document.getElementById('priority'), options.priorities, 'Medium');
+    fillSelect(document.getElementById('category'), options.problemTypes);
+    fillSelect(document.getElementById('priority'), options.priorities, options.defaultPriority);
     document.getElementById('access-section').hidden = !options.requiresAccessCode;
     updatePhotoHint();
   }
@@ -179,7 +179,7 @@
       const el = document.getElementById(k);
       if (el) el.value = v;
     }
-    document.getElementById('priority').value = 'Medium';
+    document.getElementById('priority').value = options.defaultPriority;
     photos.forEach((p) => URL.revokeObjectURL(p.url));
     photos = [];
     renderPreviews();

@@ -34,6 +34,7 @@ function validForm() {
   fd.append('repEmail', 'sam@example.com');
   fd.append('customerName', 'Acme Ltd');
   fd.append('orderNumber', 'INV-123');
+  fd.append('contactName', 'Jo Buyer');
   fd.append('category', 'Damaged goods');
   fd.append('priority', 'High');
   fd.append('description', 'Pallet arrived crushed.\n<b>Customer</b> wants a credit.');
@@ -54,7 +55,9 @@ test('serves the form and options', async () => {
   const html = await (await fetch(`${baseUrl}/`)).text();
   assert.match(html, /Log a Complaint/);
   const opts = await (await fetch(`${baseUrl}/api/options`)).json();
-  assert.ok(opts.categories.includes('Damaged goods'));
+  assert.ok(opts.problemTypes.includes('Damaged goods'));
+  assert.deepEqual(opts.priorities, ['Low', 'Normal', 'High']);
+  assert.equal(opts.defaultPriority, 'Normal');
   assert.equal(opts.requiresAccessCode, true);
   assert.equal(opts.maxFiles, 2);
 });
@@ -74,12 +77,42 @@ test('sends an email with photos to the CRM address', async () => {
   assert.deepEqual(msg.cc, ['manager@example.com']);
   assert.equal(msg.replyTo, 'sam@example.com');
   assert.equal(msg.subject, `[Complaint] High - Acme Ltd - Damaged goods (${reference})`);
-  assert.match(msg.text, /Customer: Acme Ltd/);
-  assert.match(msg.text, /Order \/ invoice number: INV-123/);
-  assert.match(msg.text, /Attachments: 2/);
+  assert.match(
+    msg.text,
+    /^CASE DETAILS \(Sage CRM\)\nCompany: Acme Ltd\nPerson: Jo Buyer\nCustomer ref \(order \/ invoice no\.\): INV-123\nProblem type: Damaged goods\nPriority: High\nDescription: Pallet arrived crushed\. <b>Customer<\/b> wants a credit\.\n\nProblem note:\nPallet arrived crushed\.\r?\n/
+  );
+  assert.match(msg.text, /SUBMITTED BY\nReference: CMP-/);
+  assert.match(msg.text, /Sales rep: Sam Rep/);
+  assert.match(msg.text, /Photos attached: 2/);
   assert.match(msg.html, /&lt;b&gt;Customer&lt;\/b&gt;/, 'HTML is escaped');
   assert.equal(msg.attachments.length, 2);
   assert.equal(msg.attachments[0].filename, `${reference}-1.jpg`);
+});
+
+test('uses the summary as the Sage description, truncating long text', async () => {
+  const withSummary = validForm();
+  withSummary.append('summary', 'Crushed pallet');
+  assert.equal((await post(withSummary)).status, 201);
+  assert.match(sent[0].text, /\nDescription: Crushed pallet\n/);
+
+  const longText = validForm();
+  longText.set('description', 'x'.repeat(200));
+  assert.equal((await post(longText)).status, 201);
+  const line = sent[1].text.split('\n').find((l) => l.startsWith('Description: '));
+  assert.equal(line.length, 'Description: '.length + 80);
+  assert.ok(line.endsWith('…'));
+});
+
+test('uses Sage dropdown values from configuration', async () => {
+  const custom = loadConfig({ PROBLEM_TYPES: 'Breakage, Shortage', PRIORITIES: 'Low,Medium,High,Urgent' });
+  assert.deepEqual(custom.problemTypes, ['Breakage', 'Shortage']);
+  assert.equal(custom.defaultPriority, 'Medium');
+  assert.equal(loadConfig({ PRIORITIES: 'Low,Medium,High', DEFAULT_PRIORITY: 'High' }).defaultPriority, 'High');
+
+  const fd = validForm();
+  fd.set('priority', 'Bogus');
+  assert.equal((await post(fd)).status, 201);
+  assert.match(sent[0].subject, /^\[Complaint\] Normal - /);
 });
 
 test('rejects a wrong access code', async () => {
@@ -96,7 +129,7 @@ test('requires mandatory fields', async () => {
   const body = await res.json();
   assert.match(body.error, /Customer name is required/);
   assert.match(body.error, /Description is required/);
-  assert.match(body.error, /category/);
+  assert.match(body.error, /problem type/);
   assert.equal(sent.length, 0);
 });
 
