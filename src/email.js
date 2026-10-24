@@ -22,6 +22,7 @@ const SUBMISSION_FIELDS = [
   ['submittedAt', 'Submitted'],
   ['repName', 'Sales rep'],
   ['repEmail', 'Rep email'],
+  ['sentTo', 'Sent to'],
 ];
 
 function makeReference(date = new Date()) {
@@ -65,8 +66,31 @@ function htmlSection(title, rows, complaint) {
   return `<h3 style="margin:16px 0 4px">${title}</h3><table style="border-collapse:collapse">${cells}</table>`;
 }
 
+// The CRM inbox is always the main recipient so every complaint reaches Sage;
+// the chosen team, fixed CCs and the rep's own copy go on CC.
+function ccList(complaint, config) {
+  const seen = new Set([config.crmEmail.toLowerCase()]);
+  const candidates = [
+    complaint.recipient?.address,
+    ...config.ccEmails,
+    complaint.sendCopy ? complaint.repEmail : '',
+  ];
+  return candidates.filter((address) => {
+    const key = (address || '').toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function buildComplaintEmail(complaint, files, config) {
-  const data = { ...complaint, summary: summarise(complaint), photos: String(files.length) };
+  const data = {
+    ...complaint,
+    summary: summarise(complaint),
+    sentTo: complaint.recipient ? `${complaint.recipient.label} (and complaints inbox)` : '',
+    photos: String(files.length),
+  };
+  const cc = ccList(complaint, config);
   const caseRows = CASE_FIELDS.filter(([key]) => data[key]);
   const submissionRows = [...SUBMISSION_FIELDS.filter(([key]) => data[key]), ['photos', 'Photos attached']];
 
@@ -102,7 +126,7 @@ function buildComplaintEmail(complaint, files, config) {
   return {
     from: config.fromEmail,
     to: config.crmEmail,
-    cc: config.ccEmails.length ? config.ccEmails : undefined,
+    cc: cc.length ? cc : undefined,
     replyTo: data.repEmail || undefined,
     subject,
     text,

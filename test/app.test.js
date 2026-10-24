@@ -8,6 +8,11 @@ const config = {
   crmEmail: 'crm@example.com',
   fromEmail: 'app@example.com',
   ccEmails: ['manager@example.com'],
+  recipients: [
+    { label: 'Quality', address: 'quality@example.com' },
+    { label: 'Warehouse', address: 'warehouse@example.com' },
+  ],
+  copyDomains: ['example.com'],
   accessCode: 'letmein',
   maxFiles: 2,
   maxFileSizeMb: 1,
@@ -113,6 +118,73 @@ test('uses Sage dropdown values from configuration', async () => {
   fd.set('priority', 'Bogus');
   assert.equal((await post(fd)).status, 201);
   assert.match(sent[0].subject, /^\[Complaint\] Normal - /);
+});
+
+test('lists team names but never their addresses', async () => {
+  const opts = await (await fetch(`${baseUrl}/api/options`)).json();
+  assert.deepEqual(opts.recipients, ['Quality', 'Warehouse']);
+  assert.deepEqual(opts.copyDomains, ['example.com']);
+  assert.doesNotMatch(JSON.stringify(opts), /quality@/);
+});
+
+test('sends to the CRM inbox and copies the chosen team and the rep', async () => {
+  const fd = validForm();
+  fd.append('recipient', 'Quality');
+  fd.append('sendCopy', 'on');
+  assert.equal((await post(fd)).status, 201);
+  const msg = sent[0];
+  assert.equal(msg.to, 'crm@example.com');
+  assert.deepEqual(msg.cc, ['quality@example.com', 'manager@example.com', 'sam@example.com']);
+  assert.match(msg.text, /Sent to: Quality \(and complaints inbox\)/);
+});
+
+test('rejects a team that is not on the list', async () => {
+  const fd = validForm();
+  fd.append('recipient', 'anyone@evil.example');
+  const res = await post(fd);
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /from the list/);
+  assert.equal(sent.length, 0);
+});
+
+test('only sends the rep a copy at a company address', async () => {
+  const noEmail = validForm();
+  noEmail.delete('repEmail');
+  noEmail.append('sendCopy', 'on');
+  const res1 = await post(noEmail);
+  assert.equal(res1.status, 400);
+  assert.match((await res1.json()).error, /Enter your email to get a copy/);
+
+  const outside = validForm();
+  outside.set('repEmail', 'someone@gmail.com');
+  outside.append('sendCopy', 'on');
+  const res2 = await post(outside);
+  assert.equal(res2.status, 400);
+  assert.match((await res2.json()).error, /@example\.com/);
+
+  const lookalike = validForm();
+  lookalike.set('repEmail', 'sam@example.com.evil.example');
+  lookalike.append('sendCopy', 'on');
+  assert.equal((await post(lookalike)).status, 400);
+
+  const smuggled = validForm();
+  smuggled.set('repEmail', 'x@evil.example,sam@example.com');
+  smuggled.append('sendCopy', 'on');
+  assert.equal((await post(smuggled)).status, 400);
+  assert.equal(sent.length, 0);
+});
+
+test('reads teams and copy domains from settings', () => {
+  const cfg = loadConfig({
+    FROM_EMAIL: 'app@Acme.co.uk',
+    RECIPIENTS: 'Customer Services=cs@acme.co.uk, Quality = quality@acme.co.uk, Broken entry, Bad=not-an-email',
+  });
+  assert.deepEqual(cfg.recipients, [
+    { label: 'Customer Services', address: 'cs@acme.co.uk' },
+    { label: 'Quality', address: 'quality@acme.co.uk' },
+  ]);
+  assert.deepEqual(cfg.copyDomains, ['acme.co.uk']);
+  assert.deepEqual(loadConfig({ COPY_DOMAINS: '@acme.co.uk, acme.com' }).copyDomains, ['acme.co.uk', 'acme.com']);
 });
 
 test('rejects a wrong access code', async () => {

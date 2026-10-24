@@ -7,6 +7,8 @@ A simple, phone-friendly web app that lets sales reps log a customer complaint w
 - One short form: their name and email (remembered on the device), customer, account/order number, problem type, priority, a one-line summary and the full description.
 - **Take photo** opens the phone camera directly. **Gallery** picks existing images. Up to 5 photos.
 - Photos are resized in the browser (max 1600px JPEG), so uploads are quick on mobile data and emails stay small.
+- **Send to:** they can pick a team from a list you set, such as Quality or Warehouse. The complaints inbox always gets every complaint, whatever they pick.
+- **Email me a copy:** a tick box sends the rep a copy. This only works for company email addresses.
 - After sending they get a reference number, e.g. `CMP-20261023-3F9A1C`.
 - It can be added to the home screen and opens like an app.
 
@@ -43,6 +45,7 @@ Photos attached: 2
 - Empty fields are left out.
 - Photos are named `<reference>-1.jpg`, `<reference>-2.jpg`, and so on.
 - **Reply-To** is the rep, so replies go straight to them.
+- **To** is always the complaints inbox. The chosen team, any fixed `CC_EMAILS` and the rep's own copy are on **Cc**.
 
 ### Filing it in Sage CRM
 
@@ -65,7 +68,9 @@ npm start              # http://localhost:3000
 | `CRM_EMAIL` | **Required.** The Outlook mailbox complaints are sent to (a shared mailbox is best) |
 | `FROM_EMAIL` | **Required.** Sender address; your SMTP account must be allowed to send as it |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | Outgoing mail server (Microsoft 365, Gmail app password, SendGrid, etc.) |
-| `CC_EMAILS` | Optional extra recipients, comma-separated |
+| `RECIPIENTS` | Optional teams for the "Send to" list, as `Name=address` pairs, comma-separated, e.g. `Quality=quality@yourcompany.com,Warehouse=warehouse@yourcompany.com`. Reps only see the names |
+| `CC_EMAILS` | Optional addresses copied on every complaint, comma-separated |
+| `COPY_DOMAINS` | Domains allowed for "Email me a copy". Defaults to the domain of `FROM_EMAIL` |
 | `APP_ACCESS_CODE` | Optional shared team code. Reps enter it once per device. Recommended if the app is on the public internet |
 | `PROBLEM_TYPES`, `PRIORITIES` | Dropdown values, comma-separated. Copy them from your Sage CRM case screen. Defaults: a starter list of problem types, and Sage's standard `Low,Normal,High` |
 | `DEFAULT_PRIORITY` | Pre-selected priority (default: the middle one) |
@@ -75,6 +80,10 @@ npm start              # http://localhost:3000
 ### Sending through Microsoft 365
 
 Use `SMTP_HOST=smtp.office365.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`, and an account that is allowed to send, for example `complaints-app@yourcompany.com`. Microsoft 365 often has **SMTP AUTH** switched off. An admin can switch it on for just that mailbox in the Microsoft 365 admin centre (Users → the user → Mail → Manage email apps → Authenticated SMTP).
+
+## Why reps can't type in any address
+
+The app sends from your company's email account, so it only sends to addresses you've set: the complaints inbox, the teams in `RECIPIENTS`, `CC_EMAILS`, and the rep's own company address. This stops the app being misused to send email to anyone, and stops a typo sending customer details to a stranger.
 
 ## Deploying
 

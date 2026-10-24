@@ -3,7 +3,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
-const { loadConfig } = require('./config');
+const { loadConfig, domainOf } = require('./config');
 const { makeReference, buildComplaintEmail } = require('./email');
 
 const ALLOWED_MIME = new Set([
@@ -15,7 +15,9 @@ const ALLOWED_MIME = new Set([
   'image/gif',
 ]);
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// No commas, semicolons, brackets or quotes, which mail parsers treat as
+// address separators or display names.
+const EMAIL_RE = /^[^\s@,;<>"()]+@[^\s@,;<>"()]+\.[^\s@,;<>"()]+$/;
 
 const LIMITS = {
   repName: 100,
@@ -65,6 +67,19 @@ function validate(body, config) {
 
   complaint.priority = config.priorities.includes(body.priority) ? body.priority : config.defaultPriority;
 
+  const recipient = typeof body.recipient === 'string' ? body.recipient : '';
+  complaint.recipient = config.recipients.find((r) => r.label === recipient) || null;
+  if (recipient && !complaint.recipient) errors.push('Choose who to send it to from the list');
+
+  complaint.sendCopy = body.sendCopy === 'on' || body.sendCopy === 'true';
+  if (complaint.sendCopy) {
+    if (!complaint.repEmail) {
+      errors.push('Enter your email to get a copy');
+    } else if (config.copyDomains.length && !config.copyDomains.includes(domainOf(complaint.repEmail))) {
+      errors.push(`Copies can only go to ${config.copyDomains.map((d) => '@' + d).join(' or ')} addresses`);
+    }
+  }
+
   return { complaint, errors };
 }
 
@@ -95,6 +110,8 @@ function createApp({ config = loadConfig(), transport } = {}) {
       problemTypes: config.problemTypes,
       priorities: config.priorities,
       defaultPriority: config.defaultPriority,
+      recipients: config.recipients.map((r) => r.label),
+      copyDomains: config.copyDomains,
       maxFiles: config.maxFiles,
       maxFileSizeMb: config.maxFileSizeMb,
       requiresAccessCode: Boolean(config.accessCode),

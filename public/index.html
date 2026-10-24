@@ -33,7 +33,11 @@
         <label>Your email
           <input name="repEmail" id="repEmail" type="email" maxlength="200" autocomplete="email">
         </label>
-        <p class="hint">Saved on this device so you don't have to retype it.</p>
+        <label class="check">
+          <input type="checkbox" name="sendCopy" id="sendCopy">
+          Email me a copy
+        </label>
+        <p class="hint" id="copy-hint">Saved on this device so you don't have to retype it.</p>
       </section>
 
       <section class="card">
@@ -61,6 +65,14 @@
 
       <section class="card">
         <h2>Complaint</h2>
+        <div id="recipient-field" hidden>
+          <label>Send to
+            <select name="recipient" id="recipient">
+              <option value="">Complaints inbox only</option>
+            </select>
+          </label>
+          <p class="hint field-hint">The complaints inbox always gets a copy.</p>
+        </div>
         <div class="row">
           <label>Problem type *
             <select name="category" id="category" required>

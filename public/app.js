@@ -5,6 +5,9 @@
   const previews = document.getElementById('previews');
   const photoHint = document.getElementById('photo-hint');
   const successEl = document.getElementById('success');
+  const recipientSelect = document.getElementById('recipient');
+  const sendCopy = document.getElementById('sendCopy');
+  const repEmail = document.getElementById('repEmail');
 
   const STORAGE_KEYS = ['repName', 'repEmail', 'accessCode'];
   // Photos are resized in the browser before upload so emails stay small
@@ -34,6 +37,7 @@
       const el = document.getElementById(key);
       if (el) el.value = store.get(key);
     }
+    sendCopy.checked = store.get('sendCopy') === 'true';
     try {
       const res = await fetch('api/options');
       options = await res.json();
@@ -43,6 +47,14 @@
     }
     fillSelect(document.getElementById('category'), options.problemTypes);
     fillSelect(document.getElementById('priority'), options.priorities, options.defaultPriority);
+    if (options.recipients?.length) {
+      fillSelect(recipientSelect, options.recipients);
+      document.getElementById('recipient-field').hidden = false;
+    }
+    if (options.copyDomains?.length) {
+      document.getElementById('copy-hint').textContent =
+        `Saved on this device. Copies can only go to ${options.copyDomains.map((d) => '@' + d).join(' or ')} addresses.`;
+    }
     document.getElementById('access-section').hidden = !options.requiresAccessCode;
     updatePhotoHint();
   }
@@ -162,10 +174,16 @@
     event.preventDefault();
     showError('');
 
+    // A copy needs somewhere to go.
+    repEmail.required = sendCopy.checked;
     if (!form.checkValidity()) {
       const firstInvalid = form.querySelector(':invalid');
       const label = firstInvalid?.closest('label')?.firstChild?.textContent?.trim().replace(/\s*\*$/, '');
-      showError(`Please check: ${label || 'required fields'}.`);
+      showError(
+        firstInvalid === repEmail && !repEmail.value
+          ? 'Enter your email so we can send you a copy.'
+          : `Please check: ${label || 'required fields'}.`
+      );
       firstInvalid?.focus();
       return;
     }
@@ -177,6 +195,7 @@
 
     store.set('repName', data.get('repName'));
     store.set('repEmail', data.get('repEmail'));
+    store.set('sendCopy', String(sendCopy.checked));
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Sending…';
@@ -212,6 +231,8 @@
       if (el) el.value = v;
     }
     document.getElementById('priority').value = options.defaultPriority;
+    sendCopy.checked = store.get('sendCopy') === 'true';
+    recipientSelect.value = '';
     photos.forEach((p) => URL.revokeObjectURL(p.url));
     photos = [];
     renderPreviews();
